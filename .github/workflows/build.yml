@@ -1,0 +1,62 @@
+# Сборка лаунчера на серверах GitHub: Windows (.exe) и macOS (.dmg для M1–M4 и Intel).
+# Запуск: вкладка Actions → «Сборка лаунчера» → Run workflow.
+# Или: создать Release — файлы сами прикрепятся к нему.
+name: Сборка лаунчера
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+            name: Windows
+          - os: macos-latest
+            script: dist:mac
+            name: macOS
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
+
+    steps:
+      - name: Скачать код
+        uses: actions/checkout@v4
+
+      - name: Установить Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Установить зависимости
+        run: npm ci
+
+      - name: Собрать
+        run: npm run ${{ matrix.script }} -- --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false   # без платной подписи (ad-hoc делает build/adhoc-sign.js)
+
+      - name: Сохранить файлы
+        uses: actions/upload-artifact@v4
+        with:
+          name: PavlovskCraft-${{ matrix.name }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+          if-no-files-found: error
+
+      - name: Прикрепить к релизу
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.dmg
