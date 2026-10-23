@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "dist:win": "electron-builder --win portable --x64",
-    "dist:mac": "electron-builder --mac dmg --arm64 --x64"
+    "dist:mac": "electron-builder --mac dmg --arm64 --publish never && electron-builder --mac dmg --x64"
   },
   "dependencies": {
     "axios": "^1.7.0",
