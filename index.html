@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Minecraft PVL</title>
+    <style>
+        @font-face {
+            font-family: 'Terminal';
+            src: url('fonts/fsex300.ttf') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'MinecraftSplash';
+            src: url('fonts/mc.ttf') format('truetype');
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Terminal', 'Consolas', monospace;
+            user-select: none;
+            -webkit-font-smoothing: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            background-color: #0d0d0d;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            -webkit-app-region: drag;
+        }
+
+        button, input, .scroll-area, .custom-checkbox, .window-controls, .build-opt, .checkbox-container, .server-box {
+            -webkit-app-region: no-drag;
+        }
+
+        .star {
+            position: absolute;
+            z-index: -1;
+            font-weight: bold;
+            text-shadow: 0 0 2px rgba(255,255,255,0.3);
+        }
+
+        .window-controls {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+            align-items: center;
+        }
+        .window-controls span { cursor: pointer; transition: color 0.2s; }
+        .window-controls span:hover { color: #aaa; }
+
+        #musicBtn { font-size: 14px; margin-right: 10px; letter-spacing: 1px; }
+
+        .ascii-header {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 5px;
+            margin-top: 15px;
+        }
+
+        /* ---- Титул PAVLOVSK CRAFT ---- */
+        .ascii-art {
+            display: flex;
+            flex-direction: column;
+            align-items: center;          /* слова центрируются вёрсткой, а не пробелами */
+            font-size: 3px;
+            line-height: 3.4px;
+            white-space: pre;
+            cursor: default;
+            -webkit-app-region: no-drag;     /* иначе в Electron не работает наведение */
+            transform-origin: 50% 100%;
+            transition: transform 0.35s cubic-bezier(.2,.9,.3,1.3), filter 0.35s;
+        }
+        /* Шрифт, где █ ▓ ░ и пробел одной ширины (в Fixedsys блоков нет — берутся из другого шрифта) */
+        .ascii-art, .ascii-art * { font-family: Consolas, 'Cascadia Mono', Menlo, 'DejaVu Sans Mono', 'Courier New', monospace; }
+        .art-word { white-space: pre; }
+        .art-word-sub { margin-top: 2px; }
+        .ascii-art span { transition: color 0.35s ease, text-shadow 0.35s ease; }
+        /* Вариант 1 — блоки с цветными гранями */
+        .ascii-art .h { color: #ffffff; }
+        .ascii-art .f { color: #e8e8e8; }
+        .ascii-art .e { color: #8c8c8c; }
+        .ascii-art .o { color: #4a4a4a; }
+        /* Наведение — вариант 2, монохром: всё белое и чуть крупнее */
+        .ascii-art.ready:hover { transform: scale(1.07); }
+        .ascii-art.ready:hover span { color: #ffffff; }
+        .ascii-art.ready:hover .o { color: #9a9a9a; }
+
+        /* Падение с отскоком: 2 удара о «землю» со сплющиванием */
+        .ascii-art.drop { animation: title-drop 1.25s cubic-bezier(.33,0,.67,1) both; }
+        @keyframes title-drop {
+            0%   { transform: translateY(-190px) scale(1, 1.08); opacity: 0; }
+            8%   { opacity: 1; }
+            46%  { transform: translateY(0) scale(1, 1); animation-timing-function: ease-out; }
+            52%  { transform: translateY(0) scale(1.06, 0.84); animation-timing-function: ease-out; }
+            66%  { transform: translateY(-30px) scale(0.98, 1.03); animation-timing-function: ease-in; }
+            78%  { transform: translateY(0) scale(1.03, 0.93); animation-timing-function: ease-out; }
+            88%  { transform: translateY(-8px) scale(1, 1); animation-timing-function: ease-in; }
+            96%  { transform: translateY(0) scale(1.01, 0.98); }
+            100% { transform: translateY(0) scale(1, 1); opacity: 1; }
+        }
+
+        /* Пыль от удара */
+        .title-dust { position: absolute; left: 0; right: 0; bottom: 0; height: 0; pointer-events: none; }
+        .dust {
+            position: absolute;
+            bottom: 0;
+            font-size: 12px;
+            color: #9a9a9a;
+            white-space: pre;
+        }
+
+        .splash-text {
+            font-family: 'MinecraftSplash', sans-serif;
+            position: absolute;
+            bottom: 12px;
+            left: calc(50% + 95px);   /* сразу за буквой T в CRAFT */
+            transform-origin: 0% 50%;
+            color: #ffff00;
+            font-size: 14px;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #3f3f00;
+            transform: rotate(-20deg);
+            opacity: 0;   /* появляется после приземления титула */
+            z-index: 100;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .splash-text.show {
+            opacity: 1;
+            animation: splash-pop 0.45s cubic-bezier(.2,1.6,.4,1) both, splash-pulse 0.4s 0.45s alternate infinite;
+        }
+        @keyframes splash-pop {
+            0%   { transform: rotate(-20deg) scale(0);   opacity: 0; }
+            60%  { transform: rotate(-20deg) scale(1.35); opacity: 1; }
+            100% { transform: rotate(-20deg) scale(1);   opacity: 1; }
+        }
+
+        @keyframes splash-pulse {
+            from { transform: rotate(-20deg) scale(1); }
+            to { transform: rotate(-20deg) scale(1.15); }
+        }
+
+        .divider {
+            text-align: center;
+            white-space: pre;
+            margin-bottom: 15px;
+            color: #aaa;
+        }
+
+        .main-grid { display: flex; gap: 20px; flex: 1; height: 100%; min-height: 0; }
+
+        .panel {
+            border: 2px dotted #fff;
+            padding: 15px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-title {
+            position: absolute;
+            top: -11px;
+            left: 14px;
+            background: #0d0d0d;
+            padding: 0 8px;
+            font-size: 16px;
+            line-height: 20px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            z-index: 10;
+            white-space: nowrap;
+        }
+        .panel-title .tag { color: #777; font-size: 12px; font-weight: normal; margin-left: 6px; }
+
+        /* overflow не скрываем — иначе обрезается заголовок, который сидит на рамке */
+        .news-box {
+            flex: 1.8;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            margin-top: 10px;
+            padding: 18px 12px 12px;
+        }
+        /* Отдельное поле под текст внутри рамки */
+        .scroll-area {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            background: transparent; /* текст прямо на фоне, как раньше */
+            padding: 8px 10px;
+        }
+        .news-content {
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .scroll-area::-webkit-scrollbar { width: 8px; }
+        .scroll-area::-webkit-scrollbar-thumb { background: #fff; }
+        .scroll-area::-webkit-scrollbar-track { background: #151515; }
+
+        /* ---- Кометы ---- */
+        #cometLayer { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
+        .comet {
+            position: absolute;
+            white-space: pre;
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            color: #ddd;
+            will-change: transform, opacity;
+        }
+        .comet .head { color: #fff; text-shadow: 0 0 6px #fff, 0 0 12px rgba(160,200,255,0.8); }
+
+        .right-column { flex: 1; display: flex; flex-direction: column; gap: 15px; min-width: 0; }
+        .right-box { display: flex; flex-direction: column; gap: 8px; }
+
+        button { background: transparent; color: #fff; border: 2px solid #fff; padding: 10px; cursor: pointer; text-transform: uppercase; transition: 0.2s; font-weight: bold;}
+        button:hover { background: #fff; color: #000; }
+
+        /* --- Виджет статуса сервера --- */
+        .server-box {
+            margin-top: 15px;
+            border: 2px dotted #555;
+            padding: 8px 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-size: 12px;
+            min-height: 72px;
+        }
+        .server-icon {
+            width: 48px;
+            height: 48px;
+            flex: 0 0 48px;
+            image-rendering: pixelated;
+            border: 1px solid #333;
+            display: none;
+        }
+        .server-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+        .server-info > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .srv-dim { color: #777; }
+        .srv-on { color: #55ff55; }
+        .srv-off { color: #ff5555; }
+        .srv-wait { color: #aaa; }
+
+        .checkbox-container { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 12px; margin-top: 5px; }
+        .custom-checkbox { width: 18px; height: 18px; border: 2px solid #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; }
+        .checkbox-container:hover .custom-checkbox { background: rgba(255,255,255,0.1); }
+
+        .footer { margin-top: 20px; display: flex; align-items: flex-end; justify-content: space-between; }
+
+        .progress-container { flex: 1; max-width: 450px; }
+        .progress-text { margin-bottom: 5px; font-size: 14px; }
+        .ascii-bar { font-size: 14px; letter-spacing: 2px; }
+
+        .controls-wrapper { display: flex; align-items: center; gap: 20px; }
+        .launch-options { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+
+        .input-group { display: flex; align-items: flex-end; gap: 10px; }
+        input.nick-error { border-bottom-color: #ff5555; animation: nick-shake 0.4s; }
+        @keyframes nick-shake { 20%,60% { transform: translateX(-4px); } 40%,80% { transform: translateX(4px); } }
+        input { background: transparent; border: none; border-bottom: 2px solid #fff; color: #fff; font-size: 16px; outline: none; padding: 2px 5px; width: 150px; }
+
+        .build-toggle { font-size: 14px; letter-spacing: 1px; }
+        .build-opt { cursor: pointer; transition: color 0.2s; margin-left: 10px; }
+        .selected-opt { color: #fff; text-shadow: 0 0 5px rgba(255,255,255,0.8); font-weight: bold; }
+        .unselected-opt { color: #555; }
+        .unselected-opt:hover { color: #aaa; }
+        .build-opt.locked { pointer-events: none; opacity: 0.5; }
+        .build-status { font-size: 11px; color: #777; margin-top: -6px; min-height: 13px; }
+        .build-status .ok { color: #55ff55; }
+        .build-status .no { color: #ffaa00; }
+
+        .play-btn { font-size: 24px; padding: 15px 40px; }
+        button:disabled { border-color: #555; color: #555; cursor: not-allowed; background: transparent; }
+
+        .blink { animation: blink-anim 1s step-end infinite; }
+        @keyframes blink-anim { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+<div id="starfield"></div>
+<div id="cometLayer"></div>
+
+<div class="window-controls">
+    <span id="musicBtn">[МУЗЫКА: ВКЛ]</span>
+    <span id="minBtn">_</span>
+    <span id="closeBtn">X</span>
+</div>
+
+<div class="ascii-header" id="titleHeader">
+    <div class="ascii-art" id="titleArt" title="PAVLOVSK CRAFT"><div class="art-word"><span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span>  <span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span>  <span class="o">░░░░░░░░░░</span>              <span class="o">░░░░░░░░░░</span>  <span class="o">░░░░░░░░░░</span>                          <span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span>  <span class="o">░░░░░░░░░░</span>              <span class="o">░░░░░░░░░░</span>  <span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span>  <span class="o">░░░░░░░░░░</span>              <span class="o">░░░░░░░░░░</span>
+        <span class="o">░░</span><span class="h">██████████████████████████████</span><span class="o">░░░░░░</span><span class="h">██████████████████████████████</span><span class="o">░░░░░░</span><span class="h">██████</span><span class="o">░░░░</span>            <span class="o">░░</span><span class="h">██████</span><span class="o">░░░░░░</span><span class="h">██████</span><span class="o">░░░░</span>                        <span class="o">░░</span><span class="h">██████████████████████████████</span><span class="o">░░░░░░</span><span class="h">██████</span><span class="o">░░░░</span>            <span class="o">░░</span><span class="h">██████</span><span class="o">░░░░░░</span><span class="h">██████████████████████████████</span><span class="o">░░░░░░</span><span class="h">██████</span><span class="o">░░░░</span>            <span class="o">░░</span><span class="h">██████</span><span class="o">░░░░</span>
+        <span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓</span><span class="o">░░░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓</span><span class="o">░░░░</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░░░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░░░░</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░░░░</span>                      <span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓</span><span class="o">░░░░</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░░░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░░░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓</span><span class="o">░░░░</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░░░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░░░░</span>
+        <span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░</span><span class="h">██████</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░</span>
+        <span class="o">░░</span><span class="f">██████</span><span class="h">██████████████████</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="h">██████████████████</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="h">████████████████████████</span><span class="o">░░░░░░</span><span class="f">██████</span><span class="h">████████████</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓</span><span class="o">░░░░</span><span class="f">██████████████████</span><span class="e">▓▓</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░</span>  <span class="o">░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░</span>  <span class="o">░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░</span>
+        <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░</span><span class="e">▓▓▓▓▓</span><span class="h">██████</span><span class="o">░░░░░░</span><span class="h">██████</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░</span><span class="e">▓▓▓▓▓</span><span class="h">██████</span><span class="o">░░░░░░</span><span class="h">██████</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="h">██████</span><span class="o">░░░░</span>
+        <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░</span><span class="e">▓▓▓</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░░░░</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░</span><span class="e">▓▓▓</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░░░░</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░░░░</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░░░░</span>
+        <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span> <span class="o">░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░░░░░░░░░</span>  <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span> <span class="o">░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░</span>
+        <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░░</span><span class="e">▓▓▓▓▓</span><span class="h">██████</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░</span><span class="f">██████</span><span class="h">████████████████████████</span><span class="o">░░░░░░</span><span class="f">██████</span><span class="h">██████████████████</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░░</span><span class="e">▓▓▓▓▓</span><span class="h">██████</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░</span><span class="h">████████████████████████</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░░</span><span class="e">▓▓▓▓▓</span><span class="h">██████</span><span class="o">░░░░</span>
+        <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>     <span class="o">░░░░</span><span class="e">▓▓▓</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓</span><span class="o">░░░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>     <span class="o">░░░░</span><span class="e">▓▓▓</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>     <span class="o">░░░░</span><span class="e">▓▓▓</span><span class="f">██████</span><span class="e">▓▓</span><span class="o">░░░░</span>
+        <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>       <span class="o">░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░</span>    <span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>       <span class="o">░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░</span>    <span class="o">░░</span><span class="f">██████████████████████████████</span><span class="e">▓▓▓▓</span><span class="o">░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>       <span class="o">░░░░░</span><span class="f">██████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>                      <span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>          <span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░░░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>                       <span class="o">░░░░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>           <span class="o">░░░░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>           <span class="o">░░░░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>           <span class="o">░░░░</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░░░░</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>           <span class="o">░░░░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>           <span class="o">░░░░</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░░░░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>           <span class="o">░░░░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░░░░░░░░░░</span>                         <span class="o">░░░░░░░░░░░</span>             <span class="o">░░░░░░░░░░░</span>             <span class="o">░░░░░░░░░░░</span>             <span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span> <span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span>             <span class="o">░░░░░░░░░░░</span>             <span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span> <span class="o">░░░░░░░░░░░</span>             <span class="o">░░░░░░░░░░░</span></div><div class="art-word art-word-sub"><span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span>    <span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span>
+        <span class="o">░░</span><span class="h">████████████████████</span><span class="o">░░░░</span><span class="h">████████████████</span><span class="o">░░░░</span>  <span class="o">░░</span><span class="h">████████████████████</span><span class="o">░░░░</span><span class="h">████████████████████</span><span class="o">░░░░</span><span class="h">████████████████████</span><span class="o">░░░░</span>
+        <span class="o">░░</span><span class="f">████████████████████</span><span class="e">▓▓</span><span class="o">░░</span><span class="f">████████████████</span><span class="e">▓▓</span><span class="o">░░░░░░</span><span class="f">████████████████████</span><span class="e">▓▓</span><span class="o">░░</span><span class="f">████████████████████</span><span class="e">▓▓</span><span class="o">░░</span><span class="f">████████████████████</span><span class="e">▓▓</span><span class="o">░░░░</span>
+        <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="h">████</span><span class="o">░░░░</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">████</span><span class="e">▓▓</span><span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░░</span><span class="e">▓▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░░░</span><span class="f">████</span><span class="h">████████████</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓</span><span class="f">████</span><span class="h">████████████</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="f">████</span><span class="h">████████████</span><span class="o">░░░░░░░░░░░░░░░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░</span>
+        <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>            <span class="o">░░</span><span class="f">████████████████</span><span class="e">▓▓</span><span class="o">░</span><span class="e">▓▓▓▓▓</span><span class="f">████████████████████</span><span class="e">▓▓▓▓</span><span class="f">████████████████</span><span class="e">▓▓</span><span class="o">░░░░</span>        <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>            <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░░░</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>        <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░░░</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░░░</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░</span>        <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░</span><span class="f">████</span><span class="h">████████████████</span><span class="o">░░░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░</span><span class="e">▓▓▓</span><span class="h">████</span><span class="o">░░░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░░░░░░░░░░░░░</span>        <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░</span><span class="f">████████████████████</span><span class="e">▓▓</span><span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░</span> <span class="o">░░░░</span><span class="e">▓</span><span class="f">████</span><span class="e">▓▓</span><span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>                    <span class="o">░░</span><span class="f">████</span><span class="e">▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>   <span class="o">░░░░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>    <span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>                    <span class="o">░░░</span><span class="e">▓▓▓▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░░░</span><span class="e">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span><span class="o">░░░</span><span class="e">▓▓▓▓▓</span><span class="o">░░</span>     <span class="o">░░░░</span><span class="e">▓▓▓▓▓</span><span class="o">░░░</span><span class="e">▓▓▓▓▓</span><span class="o">░░</span>     <span class="o">░░░░</span><span class="e">▓▓▓▓▓</span><span class="o">░░░</span><span class="e">▓▓▓▓▓</span><span class="o">░░</span>                     <span class="o">░░░░</span><span class="e">▓▓▓▓▓</span><span class="o">░░</span>
+        <span class="o">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span>       <span class="o">░░░░░░░░░░░░░░░░░</span>       <span class="o">░░░░░░░░░░░░░░░░░</span>                       <span class="o">░░░░░░░░░</span></div></div>
+    <div class="title-dust" id="titleDust"></div>
+    <div class="splash-text" id="splashText"></div>
+</div>
+
+<div class="divider">==================================================== |x| ====================================================</div>
+
+<div class="main-grid">
+    <div class="panel news-box">
+        <div class="panel-title" id="boxTitle">НОВОСТИ</div>
+        <div class="scroll-area" id="scrollArea">
+            <div class="news-content" id="terminalOutput"></div>
+        </div>
+    </div>
+
+    <div class="right-column">
+        <div class="right-box">
+            <span style="font-size: 12px; font-weight: bold;">ИГРОВЫЕ ФАЙЛЫ :</span>
+            <span id="gameDirLabel" style="font-size: 12px; color: #aaa; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">...</span>
+            <button id="openFolderBtn">ОТКРЫТЬ ПАПКУ</button>
+            <button id="updateBuildBtn">ОБНОВИТЬ СБОРКУ</button>
+            <button id="copy-log-btn">СКОПИРОВАТЬ ЛОГ</button>
+
+            <!-- Собственный виджет статуса сервера -->
+            <div class="server-box" id="serverBox" title="Нажми, чтобы обновить">
+                <img class="server-icon" id="srvIcon" alt="">
+                <div class="server-info">
+                    <div><span id="srvDot" class="srv-wait">■</span> <span id="srvState" class="srv-wait">ПРОВЕРКА СЕРВЕРА...</span></div>
+                    <div id="srvPlayers">ИГРОКИ: -/-</div>
+                    <div id="srvVersion" class="srv-dim"></div>
+                    <div id="srvAddr" class="srv-dim"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-box" style="margin-top: auto;">
+            <span style="font-size: 12px; font-weight: bold; color: #aaa;">ОБНОВЛЕНИЯ :</span>
+            <div class="checkbox-container" id="autoUpdateToggle">
+                <div class="custom-checkbox" id="updateCheck">*</div>
+                <span>АВТООБНОВЛЕНИЕ</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="footer">
+    <div class="progress-container">
+        <div class="progress-text" id="statusText">ОЖИДАНИЕ <span class="blink">_</span></div>
+        <div class="ascii-bar" id="asciiBar">[                                                  ] 0%</div>
+    </div>
+
+    <div class="controls-wrapper">
+        <div class="launch-options">
+            <div class="input-group">
+                <span>Введите ник:</span>
+                <input type="text" id="username" autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="build-toggle">
+                <span>СБОРКА:</span>
+                <span id="optFull" class="build-opt selected-opt" data-build="full">[FULL]</span>
+                <span id="optLite" class="build-opt unselected-opt" data-build="lite">[LITE]</span>
+            </div>
+            <div class="build-status" id="buildStatus">&nbsp;</div>
+        </div>
+        <button class="play-btn" id="playBtn">ИГРАТЬ</button>
+    </div>
+</div>
+
+<script>
+    const { ipcRenderer } = require('electron');
+
+    const splashes = [
+        "ИЗ СОВЫ В КОРАБЛЬ",
+        "Хз зачем Севка срал под Кораблём",
+        "Трущель - ЖИВ",
+        "Павловские комары суровее вардена!",
+        "Жарче, чем на пляже Павловского пруда!",
+        "Заблудился в Ленточном бору...",
+        "Пинг до Барнаула: 2мс!",
+        "Алтайский край одобряет!",
+        "Скрывался от инквизиции в Павловске",
+        "NeoForge 1.21.1 Ready!",
+        "Не копай под себя!",
+        "Крипер сзади!",
+        "Алмазы на 11 высоте!",
+        "Где мой гравий?",
+        "Свинозомби помнят всё..."
+    ];
+    document.getElementById('splashText').innerText = splashes[Math.floor(Math.random() * splashes.length)];
+    { // длинные фразы чуть мельче, чтобы не залезали на кнопки окна
+        const sp = document.getElementById('splashText');
+        const len = sp.innerText.length;
+        if (len > 26) sp.style.fontSize = '11px'; else if (len > 18) sp.style.fontSize = '12px';
+    }
+
+    // ---------- ТИТУЛ: падение с отскоком, пыль, потом сплеш ----------
+    const titleArt = document.getElementById('titleArt');
+    const titleDust = document.getElementById('titleDust');
+    const splashEl = document.getElementById('splashText');
+
+    function puffDust(strength) {
+        const chars = ['.', ':', '·', "'", '`', ',', '░'];
+        const n = Math.round(10 * strength);
+        const w = titleArt.offsetWidth, left0 = (titleDust.offsetWidth - w) / 2;
+        for (let i = 0; i < n; i++) {
+            const d = document.createElement('span');
+            d.className = 'dust';
+            d.textContent = chars[Math.floor(Math.random() * chars.length)];
+            const fromLeft = Math.random() < 0.5;
+            const x = left0 + (fromLeft ? Math.random() * w * 0.25 : w - Math.random() * w * 0.25);
+            d.style.left = x + 'px';
+            titleDust.appendChild(d);
+            const dx = (fromLeft ? -1 : 1) * (20 + Math.random() * 60 * strength);
+            const dy = -(6 + Math.random() * 22 * strength);
+            d.animate([
+                { transform: 'translate(0,0)', opacity: 0.9 },
+                { transform: `translate(${dx}px, ${dy}px)`, opacity: 0 }
+            ], { duration: 500 + Math.random() * 400, easing: 'ease-out' }).onfinish = () => d.remove();
+        }
+    }
+
+    function playTitleIntro() {
+        splashEl.classList.remove('show');
+        titleArt.classList.remove('ready', 'drop');
+        void titleArt.offsetWidth;                    // перезапуск анимации
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            titleArt.classList.add('ready'); splashEl.classList.add('show'); return;
+        }
+        titleArt.classList.add('drop');
+        const T = 1250;
+        setTimeout(() => puffDust(1), T * 0.46);        // первый удар
+        setTimeout(() => puffDust(0.45), T * 0.78);     // второй, слабее
+    }
+
+    titleArt.addEventListener('animationend', (e) => {
+        if (e.animationName !== 'title-drop') return;
+        titleArt.classList.remove('drop');
+        titleArt.classList.add('ready');
+        splashEl.classList.add('show');
+    });
+    // Клик по титулу — уронить ещё раз
+    titleArt.addEventListener('click', () => { if (titleArt.classList.contains('ready')) playTitleIntro(); });
+    playTitleIntro();
+
+    // Путь к папке выбранной сборки (реальный, для Windows и macOS)
+    function updateGameDirLabel() {
+        ipcRenderer.invoke('get-game-dir', currentBuild).then(dir => {
+            const s = dir.includes('\\') ? '\\' : '/';
+            const parts = dir.split(/[\\/]/).filter(Boolean);
+            const label = document.getElementById('gameDirLabel');
+            label.innerText = '...' + s + parts.slice(-3).join(s);
+            label.title = dir;
+        });
+    }
+
+    const startupSound = new Audio('audio/startup.mp3');
+    const themeSound = new Audio('audio/theme.mp3');
+    themeSound.loop = true;
+
+    let isMusicOn = localStorage.getItem('pvl_music') !== 'false';
+    const musicBtn = document.getElementById('musicBtn');
+    musicBtn.innerText = isMusicOn ? '[МУЗЫКА: ВКЛ]' : '[МУЗЫКА: ВЫКЛ]';
+
+    startupSound.play().catch(e => console.log('Аудио ошибка', e));
+
+    setTimeout(() => {
+        if (isMusicOn) themeSound.play().catch(e => console.log('Аудио ошибка', e));
+    }, 3000);
+
+    musicBtn.addEventListener('click', () => {
+        isMusicOn = !isMusicOn;
+        localStorage.setItem('pvl_music', isMusicOn);
+        musicBtn.innerText = isMusicOn ? '[МУЗЫКА: ВКЛ]' : '[МУЗЫКА: ВЫКЛ]';
+        if (isMusicOn) {
+            themeSound.play();
+        } else {
+            themeSound.pause();
+        }
+    });
+
+    document.getElementById('minBtn').addEventListener('click', () => ipcRenderer.send('window-minimize'));
+    document.getElementById('closeBtn').addEventListener('click', () => ipcRenderer.send('window-close'));
+    document.getElementById('openFolderBtn').addEventListener('click', () => ipcRenderer.send('open-folder', currentBuild));
+
+    const autoUpdateToggle = document.getElementById('autoUpdateToggle');
+    const updateCheck = document.getElementById('updateCheck');
+    let isAutoUpdate = localStorage.getItem('pvl_autoupdate') !== 'false';
+    updateCheck.innerText = isAutoUpdate ? '*' : ' ';
+
+    autoUpdateToggle.addEventListener('click', () => {
+        isAutoUpdate = !isAutoUpdate;
+        updateCheck.innerText = isAutoUpdate ? '*' : ' ';
+        localStorage.setItem('pvl_autoupdate', isAutoUpdate);
+    });
+
+    const starfield = document.getElementById('starfield');
+    const starTypes = [ { f1: '*', f2: 'X' }, { f1: '+', f2: '*' }, { f1: '.', f2: '+' }, { f1: '*', f2: ' ' } ];
+    for(let i = 0; i < 100; i++) {
+        let star = document.createElement('div');
+        star.className = 'star';
+        star.style.left = `${Math.random() * 100}vw`;
+        star.style.top = `${Math.random() * 100}vh`;
+        star.style.opacity = 0.3 + Math.random() * 0.7;
+
+        let typeIndex = Math.floor(Math.random() * starTypes.length);
+        star.innerText = starTypes[typeIndex].f1;
+        starfield.appendChild(star);
+
+        let speed = 150 + Math.random() * 1200;
+        let isFrame1 = true;
+        setInterval(() => {
+            isFrame1 = !isFrame1;
+            star.innerText = isFrame1 ? starTypes[typeIndex].f1 : starTypes[typeIndex].f2;
+            star.style.color = isFrame1 ? '#fff' : '#aaa';
+        }, speed);
+    }
+
+    // ---------- КОМЕТЫ (ASCII) ----------
+    // Изредка пролетают по диагонали: хвост из символов с затуханием, яркая голова.
+    const cometLayer = document.getElementById('cometLayer');
+    const COMET_TAILS = ['.·:-~=+*#', ' .  . - - = = + *', '.,:;-=+x*', '. . : : - = ≡ *'];
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function spawnComet() {
+        const W = window.innerWidth, H = window.innerHeight;
+        const toRight = Math.random() < 0.7;                 // чаще летят слева направо
+        const angle = 20 + Math.random() * 25;               // наклон вниз, градусы
+        const rad = angle * Math.PI / 180;
+        let tail = COMET_TAILS[Math.floor(Math.random() * COMET_TAILS.length)];
+        const chars = tail.split('');
+        const n = chars.length;
+
+        const el = document.createElement('div');
+        el.className = 'comet';
+        // голова всегда впереди по направлению полёта
+        const spans = chars.map((c, i) =>
+            `<span style="opacity:${(0.15 + 0.85 * (i + 1) / n).toFixed(2)}">${c}</span>`);
+        spans.push('<span class="head">@</span>');
+        if (!toRight) spans.reverse();
+        el.innerHTML = spans.join('');
+        el.style.fontSize = (11 + Math.random() * 6).toFixed(0) + 'px';
+        el.style.transformOrigin = toRight ? 'right center' : 'left center';
+
+        const startX = toRight ? (Math.random() * W * 0.7 - W * 0.15) : (W * 0.3 + Math.random() * W * 0.8);
+        const startY = -30 - Math.random() * H * 0.15;
+        el.style.left = startX + 'px';
+        el.style.top = startY + 'px';
+        cometLayer.appendChild(el);
+
+        const dist = Math.hypot(W, H) * (0.5 + Math.random() * 0.5);
+        const dx = (toRight ? 1 : -1) * Math.cos(rad) * dist;
+        const dy = Math.sin(rad) * dist;
+        const rot = toRight ? angle : -angle;
+        const duration = 1300 + Math.random() * 1700;
+
+        const anim = el.animate([
+            { transform: `translate(0px, 0px) rotate(${rot}deg)`, opacity: 0 },
+            { opacity: 1, offset: 0.12 },
+            { opacity: 1, offset: 0.7 },
+            { transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)`, opacity: 0 }
+        ], { duration, easing: 'cubic-bezier(.3,.1,.7,1)' });
+        anim.onfinish = () => el.remove();
+    }
+
+    function scheduleComet() {
+        const delay = 4000 + Math.random() * 9000;           // раз в 4–13 секунд
+        setTimeout(() => {
+            if (!document.hidden) {
+                spawnComet();
+                if (Math.random() < 0.15) setTimeout(spawnComet, 250 + Math.random() * 500); // иногда парой
+            }
+            scheduleComet();
+        }, delay);
+    }
+    if (!reduceMotion) { setTimeout(spawnComet, 1500); scheduleComet(); }
+
+    // ---------- ВЫБОР СБОРКИ ----------
+    const BUILD_RAM = { full: 6144, lite: 4096 };
+    let currentBuild = localStorage.getItem('pvl_build') === 'lite' ? 'lite' : 'full';
+    let currentRam = BUILD_RAM[currentBuild];
+    let buildsState = {};
+    let isBusy = false;
+    const buildOpts = [document.getElementById('optFull'), document.getElementById('optLite')];
+    const buildStatus = document.getElementById('buildStatus');
+
+    function renderBuilds() {
+        buildOpts.forEach(el => {
+            const id = el.dataset.build;
+            el.className = 'build-opt ' + (id === currentBuild ? 'selected-opt' : 'unselected-opt') + (isBusy ? ' locked' : '');
+        });
+        const st = buildsState[currentBuild];
+        if (!st) { buildStatus.innerHTML = '&nbsp;'; return; }
+        buildStatus.innerHTML = st.installed
+            ? '<span class="ok">■</span> СКАЧАНА — ЗАПУСК БЕЗ ЗАГРУЗКИ'
+            : '<span class="no">■</span> НЕ СКАЧАНА — ЗАГРУЗИТСЯ ПРИ ЗАПУСКЕ';
+    }
+
+    function refreshBuildsState() {
+        return ipcRenderer.invoke('get-builds-state').then(s => { buildsState = s || {}; renderBuilds(); });
+    }
+
+    function selectBuild(id) {
+        if (isBusy || !BUILD_RAM[id]) return;
+        currentBuild = id;
+        currentRam = BUILD_RAM[id];
+        localStorage.setItem('pvl_build', id);
+        renderBuilds();
+        updateGameDirLabel();
+    }
+
+    buildOpts.forEach(el => el.addEventListener('click', () => selectBuild(el.dataset.build)));
+    renderBuilds();
+    updateGameDirLabel();
+    refreshBuildsState();
+
+    const terminalOutput = document.getElementById('terminalOutput');
+    const scrollArea = document.getElementById('scrollArea');
+    const boxTitle = document.getElementById('boxTitle');
+    const playBtn = document.getElementById('playBtn');
+    const updateBuildBtn = document.getElementById('updateBuildBtn');
+    const statusText = document.getElementById('statusText');
+    const asciiBar = document.getElementById('asciiBar');
+    const usernameInput = document.getElementById('username');
+
+    usernameInput.value = localStorage.getItem('pvl_user') || '';
+
+    // ---------- СТАТУС СЕРВЕРА ----------
+    let SERVER_IP = 'spiral-zurich.tun.ply.gg';
+    const srvIcon = document.getElementById('srvIcon');
+    const srvDot = document.getElementById('srvDot');
+    const srvState = document.getElementById('srvState');
+    const srvPlayers = document.getElementById('srvPlayers');
+    const srvVersion = document.getElementById('srvVersion');
+    const srvAddr = document.getElementById('srvAddr');
+
+    function setSrvClass(cls) { srvDot.className = cls; srvState.className = cls; }
+
+    async function updateServerStatus() {
+        srvAddr.innerText = SERVER_IP;
+        const s = await ipcRenderer.invoke('server-status', SERVER_IP);
+
+        if (s.error) {
+            setSrvClass('srv-wait');
+            srvState.innerText = 'НЕТ ДАННЫХ';
+            srvPlayers.innerText = 'ИГРОКИ: -/-';
+            srvVersion.innerText = '';
+            srvIcon.style.display = 'none';
+            return;
+        }
+
+        if (s.online) {
+            setSrvClass('srv-on');
+            srvState.innerText = 'ОНЛАЙН';
+            srvPlayers.innerText = s.players ? `ИГРОКИ: ${s.players.online}/${s.players.max}` : 'ИГРОКИ: ?';
+            srvVersion.innerText = s.version || '';
+        } else {
+            setSrvClass('srv-off');
+            srvState.innerText = 'ОФФЛАЙН';
+            srvPlayers.innerText = 'ИГРОКИ: 0/0';
+            srvVersion.innerText = '';
+        }
+
+        if (s.icon && s.icon.startsWith('data:image/')) {
+            srvIcon.src = s.icon;
+            srvIcon.style.display = 'block';
+        } else {
+            srvIcon.style.display = 'none';
+        }
+    }
+
+    document.getElementById('serverBox').addEventListener('click', updateServerStatus);
+
+    // ---------- НОВОСТИ (с кэшем) ----------
+    let newsHtml = null;      // последние новости
+    let newsFromCache = false;
+    let consoleLines = [];    // лог последнего запуска (для «СКОПИРОВАТЬ ЛОГ»)
+    let viewMode = 'news';    // 'news' | 'console'
+    const MAX_CONSOLE_LINES = 3000;
+
+    function loadNewsCache() {
+        try { return JSON.parse(localStorage.getItem('pvl_config_cache') || 'null'); } catch { return null; }
+    }
+
+    function applyConfig(data) {
+        if (data.server_ip) SERVER_IP = data.server_ip;
+        if (data.builds) ipcRenderer.send('remote-config', { builds: data.builds });
+        if (typeof data.news === 'string') newsHtml = data.news;
+    }
+
+    function showNews() {
+        viewMode = 'news';
+        boxTitle.innerHTML = newsFromCache ? 'НОВОСТИ<span class="tag">[СОХРАНЁННЫЕ]</span>' : 'НОВОСТИ';
+        const body = newsHtml || '> НОВОСТЕЙ ПОКА НЕТ.';
+        terminalOutput.innerHTML = body + `\n\n> ГОТОВ К ЗАПУСКУ. ЖДУ КОМАНДЫ...<span class="blink">_</span>`;
+        scrollArea.scrollTop = 0;
+    }
+
+    function showConsole(firstLine) {
+        viewMode = 'console';
+        boxTitle.innerText = 'CONSOLE LOG';
+        consoleLines = [];
+        terminalOutput.textContent = '';
+        appendConsole(firstLine);
+    }
+
+    function appendConsole(text) {
+        consoleLines.push(text);
+        if (consoleLines.length > MAX_CONSOLE_LINES) consoleLines.splice(0, consoleLines.length - MAX_CONSOLE_LINES);
+        if (viewMode !== 'console') return;
+        terminalOutput.appendChild(document.createTextNode(`${text}\n`));
+        while (terminalOutput.childNodes.length > MAX_CONSOLE_LINES) terminalOutput.removeChild(terminalOutput.firstChild);
+        scrollArea.scrollTop = scrollArea.scrollHeight;
+    }
+
+    // Сначала мгновенно показываем кэш, потом обновляем из сети
+    const cached = loadNewsCache();
+    if (cached) { applyConfig(cached); newsFromCache = true; showNews(); }
+    else terminalOutput.innerHTML = `> ЗАГРУЗКА НОВОСТЕЙ...<span class="blink">_</span>`;
+
+    ipcRenderer.invoke('fetch-config').then(res => {
+        if (res && res.ok) {
+            applyConfig(res.data);
+            newsFromCache = false;
+            try { localStorage.setItem('pvl_config_cache', JSON.stringify(res.data)); } catch {}
+        } else if (!cached) {
+            newsHtml = '> НЕ УДАЛОСЬ ЗАГРУЗИТЬ НОВОСТИ — НЕТ СВЯЗИ.\n> ИГРАТЬ МОЖНО И БЕЗ НИХ.';
+        }
+        if (viewMode === 'news') showNews();
+    }).finally(() => {
+        updateServerStatus();
+        setInterval(updateServerStatus, 60000);
+    });
+
+    document.getElementById('copy-log-btn').addEventListener('click', () => {
+        const logsText = consoleLines.length ? consoleLines.join('\n') : terminalOutput.innerText;
+        ipcRenderer.send('copy-log', logsText);
+        alert('Лог успешно скопирован в буфер обмена! Также он дублируется в файл pvl_log.txt в папке игры.');
+    });
+
+    function setBusy(busy) {
+        isBusy = busy;
+        playBtn.disabled = busy;
+        updateBuildBtn.disabled = busy;
+        renderBuilds();
+    }
+
+    // Ник в Minecraft: 3–16 символов, только латиница, цифры и _
+    function checkNick() {
+        const nick = usernameInput.value.trim();
+        let err = null;
+        if (!nick) err = 'ВВЕДИ НИК';
+        else if (!/^[A-Za-z0-9_]+$/.test(nick)) err = 'НИК: ТОЛЬКО ЛАТИНИЦА, ЦИФРЫ И _';
+        else if (nick.length < 3 || nick.length > 16) err = 'НИК: ОТ 3 ДО 16 СИМВОЛОВ';
+        if (err) {
+            statusText.innerHTML = `<span style="color:#ff5555">${err}</span> <span class="blink">_</span>`;
+            usernameInput.classList.remove('nick-error'); void usernameInput.offsetWidth;
+            usernameInput.classList.add('nick-error');
+            usernameInput.focus();
+            return null;
+        }
+        statusText.innerHTML = `ПОДГОТОВКА <span class="blink">_</span>`;
+        return nick;
+    }
+    usernameInput.addEventListener('input', () => usernameInput.classList.remove('nick-error'));
+    usernameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !playBtn.disabled) playBtn.click(); });
+
+    playBtn.addEventListener('click', () => {
+        const username = checkNick();
+        if (!username) return;
+        localStorage.setItem('pvl_user', username);
+
+        setBusy(true);
+        clearTimeout(backToNewsTimer);
+        showConsole('> ПОДГОТОВКА К ЗАПУСКУ...');
+        themeSound.pause();
+
+        ipcRenderer.send('launch-game', { username, memory: currentRam, buildType: currentBuild, autoUpdate: isAutoUpdate });
+    });
+
+    updateBuildBtn.addEventListener('click', () => {
+        const username = checkNick();
+        if (!username) return;
+        localStorage.setItem('pvl_user', username);
+
+        setBusy(true);
+        clearTimeout(backToNewsTimer);
+        showConsole(`> ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ СБОРКИ ${currentBuild.toUpperCase()}...`);
+        themeSound.pause();
+
+        ipcRenderer.send('launch-game', { username, memory: currentRam, buildType: currentBuild, autoUpdate: true, forceUpdate: true });
+    });
+
+    // Разблокировать кнопки после выхода из игры или ошибки
+    // Игра закрылась нормально — через пару секунд возвращаем новости.
+    // Если вылет или ошибка — оставляем лог на экране, чтобы было видно причину.
+    let backToNewsTimer = null;
+    ipcRenderer.on('launch-finished', (_, info) => {
+        setBusy(false);
+        refreshBuildsState();
+        if (isMusicOn) themeSound.play().catch(() => {});
+        if (info && info.ok) {
+            backToNewsTimer = setTimeout(() => { if (!isBusy) showNews(); }, 2500);
+        }
+    });
+
+    ipcRenderer.on('game-log', (_, log) => appendConsole(log));
+
+    ipcRenderer.on('status', (_, msg) => {
+        statusText.innerHTML = `${msg} <span class="blink">_</span>`;
+    });
+
+    ipcRenderer.on('progress', (_, p) => {
+        const perc = p.total ? Math.min(100, Math.round((p.task / p.total) * 100)) : 0;
+        const totalChars = 50;
+        const filled = Math.round((perc / 100) * totalChars);
+        let barStr = '';
+        for(let i=0; i<totalChars; i++) {
+            if (i < filled) {
+                if (i < totalChars * 0.3) barStr += '░';
+                else if (i < totalChars * 0.7) barStr += '▓';
+                else barStr += '█';
+            } else barStr += ' ';
+        }
+        asciiBar.innerText = `[${barStr}] ${perc}%`;
+    });
+
+</script>
+</body>
+</html>
