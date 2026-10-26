@@ -10,13 +10,7 @@ const crypto = require('crypto');
 app.commandLine.appendSwitch('ssl-version-max', 'tls1.2');
 app.commandLine.appendSwitch('ignore-certificate-errors');
 
-// ============================================================
-//  НАСТРОЙКИ
-// ============================================================
-// Сборки. У каждой своя папка игры (mods, config, saves...),
-// а libraries / assets / versions общие — в корне .minecraft_pvl.
-// gameDir: null = корень .minecraft_pvl (так FULL жила раньше — старая установка подхватится без перекачки).
-// Ссылки можно переопределить в config.json на GitHub: { "builds": { "full": { "url": "..." }, "lite": { "url": "..." } } }
+
 const BUILDS = {
     full: {
         id: 'full',
@@ -35,19 +29,16 @@ const BUILDS = {
     }
 };
 
-// Папки, которые общие для всех сборок
+
 const SHARED_DIRS = ['libraries', 'assets', 'versions'];
 const BUILD_MARKER = '.pvl_build.json';
 const VANILLA_ID = '1.21.1';
 const MIN_JAVA = 21;
 
-// Дополнительные JVM-флаги для совместимости модов сборки.
-// customskinloader.ignorePatchFailure — CustomSkinLoader 15.1 падает при старте,
-// если его патч SkinManager не применился (конфликт с другими модами).
+
 const EXTRA_JVM_ARGS = [
     '-Dcustomskinloader.ignorePatchFailure=true',
-    // Вывод Java в UTF-8: иначе на русской Windows сообщения об ошибках
-    // приходят в cp1251/cp866 и в консоли лаунчера превращаются в "??????"
+
     '-Dfile.encoding=UTF-8',
     '-Dstdout.encoding=UTF-8',
     '-Dstderr.encoding=UTF-8',
@@ -58,7 +49,7 @@ const EXTRA_JVM_ARGS = [
 const MOJANG_MANIFEST = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
 const MOJANG_RESOURCES = 'https://resources.download.minecraft.net';
 
-// Имя ОС в терминах Mojang-правил (rules[].os.name)
+
 const OS_NAME = { win32: 'windows', darwin: 'osx', linux: 'linux' }[process.platform] || 'linux';
 const IS_WIN = process.platform === 'win32';
 const IS_MAC = process.platform === 'darwin';
@@ -72,7 +63,7 @@ function createWindow() {
         frame: false,
         resizable: false,
         backgroundColor: '#0d0d0d',
-        // Иконка окна и панели задач (для собранного .exe/.app берётся из настроек сборки)
+
         icon: fs.existsSync(path.join(__dirname, 'icon.png')) ? path.join(__dirname, 'icon.png') : undefined,
         webPreferences: {
             nodeIntegration: true,
@@ -83,7 +74,7 @@ function createWindow() {
 }
 
 app.whenReady().then(createWindow);
-// macOS: клик по иконке в Dock снова открывает окно
+
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
@@ -101,7 +92,7 @@ ipcMain.on('copy-log', (event, logs) => {
     clipboard.writeText(logs);
 });
 
-// config.json с новостями: GitHub raw часто недоступен, поэтому есть зеркало jsDelivr
+
 const CONFIG_SOURCES = [
     'https://raw.githubusercontent.com/witchcorepvl-coder/pvl-launcher-data/main/config.json',
     'https://cdn.jsdelivr.net/gh/witchcorepvl-coder/pvl-launcher-data@main/config.json'
@@ -119,7 +110,7 @@ ipcMain.handle('fetch-config', async () => {
 
 ipcMain.handle('get-game-dir', (_, buildId) => getGameDir(getBuild(buildId)));
 
-// Какие сборки уже скачаны
+
 ipcMain.handle('get-builds-state', () => {
     const state = {};
     for (const b of Object.values(BUILDS)) {
@@ -129,7 +120,7 @@ ipcMain.handle('get-builds-state', () => {
     return state;
 });
 
-// Переопределение ссылок из config.json (GitHub)
+
 ipcMain.on('remote-config', (_, data) => {
     if (!data || typeof data !== 'object' || !data.builds) return;
     for (const [id, cfg] of Object.entries(data.builds)) {
@@ -139,9 +130,7 @@ ipcMain.on('remote-config', (_, data) => {
     }
 });
 
-// ============================================================
-//  СБОРКИ: УСТАНОВКА / ПРОВЕРКА / ПЕРЕКЛЮЧЕНИЕ
-// ============================================================
+
 function getBuild(id) {
     return BUILDS[id] || BUILDS.full;
 }
@@ -150,14 +139,14 @@ function getGameDir(build) {
     return build.gameDir ? path.join(minecraftDir, ...build.gameDir.split('/')) : minecraftDir;
 }
 
-// Dropbox: dl=0 открывает страницу предпросмотра, для скачивания нужен dl=1
+
 function directUrl(url) {
     if (!/dropbox\.com/.test(url)) return url;
     if (/[?&]dl=\d/.test(url)) return url.replace(/([?&])dl=\d/, '$1dl=1');
     return url + (url.includes('?') ? '&' : '?') + 'dl=1';
 }
 
-// Ключ для сравнения ссылок без случайного параметра st=
+
 function urlKey(url) {
     return directUrl(url).replace(/([?&])st=[^&]*&?/, '$1').replace(/[?&]$/, '');
 }
@@ -169,7 +158,7 @@ function readMarker(build) {
         return JSON.parse(fs.readFileSync(markerPath, 'utf8'));
     } catch {}
 
-    // Старая установка FULL (до появления маркера): моды и NeoForge уже лежат в корне
+
     if (!build.gameDir) {
         const neoJson = path.join(minecraftDir, 'versions', build.versionId, `${build.versionId}.json`);
         if (fs.existsSync(path.join(minecraftDir, 'mods')) && fs.existsSync(neoJson)) {
@@ -187,8 +176,7 @@ function writeMarker(build, data) {
     fs.writeFileSync(path.join(gameDir, BUILD_MARKER), JSON.stringify(data, null, 2));
 }
 
-// «Отпечаток» архива на Dropbox (etag / размер) — чтобы понять, обновился ли он,
-// не скачивая весь файл. Запрашиваем только 1 байт.
+
 async function getRemoteFingerprint(url) {
     const res = await axios.get(directUrl(url), {
         responseType: 'stream',
@@ -202,7 +190,7 @@ async function getRemoteFingerprint(url) {
     return h['etag'] || total || h['content-length'] || null;
 }
 
-// Перемещение с заменой: если папки нет — просто переименовываем (быстро), иначе сливаем
+
 function moveMerge(src, dest) {
     if (!fs.existsSync(dest)) {
         fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -221,7 +209,7 @@ function moveMerge(src, dest) {
     fs.rmSync(src, { recursive: true, force: true });
 }
 
-// Архив может содержать файлы в корне или в одной вложенной папке
+
 function findContentRoot(dir) {
     const entries = fs.readdirSync(dir).filter(n => n !== '__MACOSX' && !n.startsWith('.'));
     const markers = ['mods', 'versions', 'libraries', 'config'];
@@ -261,13 +249,13 @@ async function installBuild(build, sender, fingerprint) {
     const src = findContentRoot(tmpDir);
     const versionId = detectNeoVersion(path.join(src, 'versions'), build.versionId);
 
-    // Общие папки — в корень
+
     for (const name of SHARED_DIRS) {
         const p = path.join(src, name);
         if (fs.existsSync(p)) moveMerge(p, path.join(minecraftDir, name));
     }
 
-    // mods заменяем целиком — иначе остаются удалённые из сборки моды и дубли версий
+
     fs.mkdirSync(gameDir, { recursive: true });
     const srcMods = path.join(src, 'mods');
     if (fs.existsSync(srcMods)) {
@@ -275,7 +263,7 @@ async function installBuild(build, sender, fingerprint) {
         moveMerge(srcMods, path.join(gameDir, 'mods'));
     }
 
-    // Остальное (config, kubejs, resourcepacks, options.txt...) — сливаем в папку сборки
+
     for (const name of fs.readdirSync(src)) {
         if (name === '__MACOSX') continue;
         moveMerge(path.join(src, name), path.join(gameDir, name));
@@ -296,7 +284,7 @@ async function installBuild(build, sender, fingerprint) {
     return marker;
 }
 
-// Решаем, качать ли сборку: нет установки / принудительно / сменилась ссылка / обновился архив
+
 async function ensureBuild(build, { autoUpdate, forceUpdate }, sender) {
     let marker = readMarker(build);
 
@@ -324,7 +312,7 @@ async function ensureBuild(build, { autoUpdate, forceUpdate }, sender) {
             return installBuild(build, sender, fp);
         }
         if (fp && !marker.fingerprint) {
-            // старая установка без отпечатка — считаем актуальной и запоминаем
+
             marker.fingerprint = fp;
             writeMarker(build, marker);
         }
@@ -334,9 +322,7 @@ async function ensureBuild(build, { autoUpdate, forceUpdate }, sender) {
     return marker;
 }
 
-// ============================================================
-//  СТАТУС СЕРВЕРА (запрос из main-процесса — без CORS и iframe)
-// ============================================================
+
 ipcMain.handle('server-status', async (_, address) => {
     if (typeof address !== 'string' || !/^[a-zA-Z0-9.\-:]+$/.test(address)) {
         return { error: 'Некорректный адрес сервера' };
@@ -358,9 +344,7 @@ ipcMain.handle('server-status', async (_, address) => {
     }
 });
 
-// ============================================================
-//  УТИЛИТЫ
-// ============================================================
+
 function getOfflineUUID(username) {
     const md5Bytes = crypto.createHash('md5').update(`OfflinePlayer:${username}`).digest();
     md5Bytes[6] = (md5Bytes[6] & 0x0f) | 0x30;
@@ -369,7 +353,7 @@ function getOfflineUUID(username) {
     return `${hex.substring(0,8)}-${hex.substring(8,12)}-${hex.substring(12,16)}-${hex.substring(16,20)}-${hex.substring(20,32)}`;
 }
 
-// Кроссплатформенная проверка правил библиотек
+
 function isLibraryAllowed(lib) {
     if (!lib.rules) return true;
     const arch = process.arch === 'ia32' ? 'x86' : process.arch;
@@ -380,7 +364,7 @@ function isLibraryAllowed(lib) {
             if (rule.os.name && rule.os.name !== OS_NAME) match = false;
             if (rule.os.arch && rule.os.arch !== arch) match = false;
         }
-        if (rule.features) match = false; // demo / custom resolution и т.п. — не используем
+        if (rule.features) match = false; 
         if (match) allowed = (rule.action === 'allow');
     }
     return allowed;
@@ -397,7 +381,7 @@ function sha1File(filePath) {
     return crypto.createHash('sha1').update(fs.readFileSync(filePath)).digest('hex');
 }
 
-// Скачивание файла с проверкой sha1/sha256, через .part и до 3 попыток
+
 async function downloadFile(url, dest, { sha1, sha256, onData, timeout = 60000 } = {}) {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     const tmp = dest + '.part';
@@ -432,7 +416,7 @@ async function downloadFile(url, dest, { sha1, sha256, onData, timeout = 60000 }
     throw new Error(`Не удалось скачать ${url}: ${lastErr && lastErr.message}`);
 }
 
-// Параллельная обработка с ограничением
+
 async function runPool(items, limit, worker, onProgress) {
     let index = 0, done = 0;
     const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
@@ -446,9 +430,7 @@ async function runPool(items, limit, worker, onProgress) {
     await Promise.all(runners);
 }
 
-// ============================================================
-//  ВАНИЛЬ: JSON + JAR + БИБЛИОТЕКИ + АССЕТЫ С СЕРВЕРОВ MOJANG
-// ============================================================
+
 async function ensureVanilla(versionId, sender) {
     const dir = path.join(minecraftDir, 'versions', versionId);
     const jsonPath = path.join(dir, `${versionId}.json`);
@@ -499,7 +481,7 @@ async function ensureLibraries(libs, sender) {
     for (const lib of libs) {
         if (!isLibraryAllowed(lib)) continue;
         const art = lib.downloads && lib.downloads.artifact;
-        if (!art || !art.path || !art.url) continue; // пустой url = файл генерирует установщик NeoForge (должен быть в архиве)
+        if (!art || !art.path || !art.url) continue; 
         const dest = path.join(minecraftDir, 'libraries', ...art.path.split('/'));
         if (seen.has(dest)) continue;
         seen.add(dest);
@@ -550,9 +532,7 @@ async function ensureAssets(vanillaData, sender) {
     return ai.id;
 }
 
-// ============================================================
-//  ПОИСК JAVA 21+ (Windows / macOS / Linux)
-// ============================================================
+
 function getJavaMajor(javaPath) {
     try {
         const r = spawnSync(javaPath, ['-version'], { encoding: 'utf8', windowsHide: true, timeout: 15000 });
@@ -578,7 +558,7 @@ function javaCandidates() {
 
     if (process.env.PVL_JAVA) add(process.env.PVL_JAVA);
 
-    // JRE внутри папки игры (можно положить в архив сборки)
+  
     add(path.join(minecraftDir, 'runtime', 'bin', exe));
     add(path.join(minecraftDir, 'java', 'bin', exe));
     if (IS_MAC) add(path.join(minecraftDir, 'runtime', 'Contents', 'Home', 'bin', 'java'));
@@ -590,7 +570,7 @@ function javaCandidates() {
         const vendors = ['Eclipse Adoptium', 'Java', 'Microsoft', 'Zulu', 'BellSoft', 'Amazon Corretto', 'Semeru'];
         for (const base of pf) for (const v of vendors) for (const d of subdirs(path.join(base, v))) add(path.join(d, 'bin', exe));
 
-        // Java из официального лаунчера Minecraft
+
         const rt = path.join('java-runtime-delta', 'windows-x64', 'java-runtime-delta', 'bin', exe);
         if (process.env.LOCALAPPDATA) add(path.join(process.env.LOCALAPPDATA, 'Packages', 'Microsoft.4297127D64EC6_8wekyb3d8bbwe', 'LocalCache', 'Local', 'runtime', rt));
         if (process.env.APPDATA) add(path.join(process.env.APPDATA, '.minecraft', 'runtime', rt));
@@ -615,15 +595,13 @@ function javaCandidates() {
         for (const d of subdirs('/usr/lib/jvm')) add(path.join(d, 'bin', 'java'));
     }
 
-    add('java'); // из PATH — в самом конце
+    add('java'); 
     return list;
 }
 
 let cachedJava = null;
 function findJava() {
     if (cachedJava) return cachedJava;
-    // Предпочитаем ровно Java 21 (родная для NeoForge 1.21.1 и LWJGL 3.3.3),
-    // более новую берём только если 21 не найдена.
     let fallback = null;
     for (const candidate of javaCandidates()) {
         if (candidate !== 'java' && !fs.existsSync(candidate)) continue;
@@ -638,10 +616,7 @@ function findJava() {
     return cachedJava;
 }
 
-// ============================================================
-//  АВТОУСТАНОВКА JAVA 21 (Eclipse Temurin, без установщика и без прав админа)
-// ============================================================
-// Java кладётся в .minecraft_pvl/runtime/java21 и используется только лаунчером.
+
 const RUNTIME_DIR = path.join(minecraftDir, 'runtime', 'java21');
 const ADOPTIUM_API = 'https://api.adoptium.net/v3/assets/latest/21/hotspot';
 
@@ -651,7 +626,7 @@ function adoptiumPlatform() {
     return { osName, arch };
 }
 
-// Ищем bin/java внутри распакованной папки (на macOS это Contents/Home/bin/java)
+
 function findJavaIn(dir, depth = 0) {
     const exe = IS_WIN ? 'java.exe' : 'java';
     const direct = path.join(dir, 'bin', exe);
@@ -676,7 +651,7 @@ async function downloadJava(sender) {
     sender.send('game-log', '> JAVA НЕ НАЙДЕНА — СКАЧИВАЮ JAVA 21 (ОДИН РАЗ, ~50 МБ)...');
     sender.send('status', 'ЗАГРУЗКА JAVA');
 
-    // Сначала JRE (меньше), если для платформы нет — JDK
+
     let pkg = null, release = null;
     for (const imageType of ['jre', 'jdk']) {
         try {
@@ -708,7 +683,6 @@ async function downloadJava(sender) {
     if (pkg.name.endsWith('.zip')) {
         await extract(archive, { dir: tmpDir });
     } else {
-        // .tar.gz (macOS/Linux) — системный tar сохраняет права на запуск
         const r = spawnSync('tar', ['-xzf', archive, '-C', tmpDir], { encoding: 'utf8' });
         if (r.status !== 0) throw new Error(`Не удалось распаковать Java: ${r.stderr || r.error}`);
     }
@@ -727,7 +701,7 @@ async function downloadJava(sender) {
     return { path: javaPath, major };
 }
 
-// Порядок: своя скачанная Java → системная Java 21 → скачать → (если не вышло) системная новее 21
+
 let javaReady = null;
 async function ensureJava(sender) {
     if (javaReady && fs.existsSync(javaReady.path)) return javaReady;
@@ -749,7 +723,7 @@ async function ensureJava(sender) {
     }
 }
 
-// Память: не больше, чем есть у компьютера (оставляем 2 ГБ системе), но не меньше 2 ГБ
+
 function pickRam(requestedMB, sender) {
     const totalMB = Math.floor(os.totalmem() / 1024 / 1024);
     const maxMB = Math.max(2048, totalMB - 2048);
@@ -760,15 +734,12 @@ function pickRam(requestedMB, sender) {
     return requestedMB;
 }
 
-// ============================================================
-//  ЗАПУСК
-// ============================================================
+
 let launchBusy = false;
 
 ipcMain.on('launch-game', async (event, args) => {
     const { username, memory, buildType, autoUpdate, forceUpdate } = args;
     const sender = event.sender;
-    // info: { ok, code } — интерфейс решает, вернуть ли новости или оставить лог ошибки
     const finish = (info = { ok: false }) => { launchBusy = false; sender.send('launch-finished', info); };
 
     if (launchBusy) {
@@ -780,18 +751,18 @@ ipcMain.on('launch-game', async (event, args) => {
     try {
         if (!fs.existsSync(minecraftDir)) fs.mkdirSync(minecraftDir, { recursive: true });
 
-        // --- Сборка: ставим, обновляем или просто берём установленную ---
+
         const build = getBuild(buildType);
         const gameDir = getGameDir(build);
         sender.send('game-log', `> ВЫБРАНА СБОРКА: ${build.name}`);
         const marker = await ensureBuild(build, { autoUpdate, forceUpdate }, sender);
 
-        // --- Java ---
+
         sender.send('status', 'ПОИСК JAVA');
         const java = await ensureJava(sender);   // нет Java — скачает сама
         sender.send('game-log', `> JAVA ${java.major}: ${java.path}`);
 
-        // --- NeoForge ---
+
         const versionId = marker.versionId || build.versionId;
         const neoJsonPath = path.join(minecraftDir, 'versions', versionId, `${versionId}.json`);
         if (!fs.existsSync(neoJsonPath)) {
@@ -800,7 +771,7 @@ ipcMain.on('launch-game', async (event, args) => {
         const neoData = JSON.parse(fs.readFileSync(neoJsonPath, 'utf8'));
         const parentId = neoData.inheritsFrom || VANILLA_ID;
 
-        // --- Ваниль: докачиваем всё, чего нет в архиве ---
+
         sender.send('game-log', `> ПРОВЕРКА ВАНИЛЬНЫХ ФАЙЛОВ ${parentId}...`);
         const vanillaData = await ensureVanilla(parentId, sender);
         const allLibs = [...(vanillaData.libraries || []), ...(neoData.libraries || [])];
@@ -812,7 +783,7 @@ ipcMain.on('launch-game', async (event, args) => {
         sender.send('status', 'ЗАПУСК MINECRAFT');
         sender.send('progress', { task: 1, total: 1 });
 
-        // --- Classpath ---
+
         const classpathSet = new Set();
         allLibs.forEach(lib => {
             if (!isLibraryAllowed(lib)) return;
@@ -822,21 +793,17 @@ ipcMain.on('launch-game', async (event, args) => {
             }
         });
 
-        // ВАЖНО: ванильный 1.21.1.jar в classpath НЕ добавляем.
-        // NeoForge сам подключает Minecraft из client-1.21.1-...-srg.jar,
-        // и второй копией получаем ResolutionException
-        // ("Modules _1._21._1 and minecraft export package ...").
-        // Ванильный jar нужен только как исходник для установщика NeoForge.
-        const neoJar = path.join(minecraftDir, 'versions', versionId, `${versionId}.jar`);
-        if (fs.existsSync(neoJar)) classpathSet.add(neoJar); // он в -DignoreList, безопасно
 
-        const sep = path.delimiter; // ';' на Windows, ':' на macOS/Linux
+        const neoJar = path.join(minecraftDir, 'versions', versionId, `${versionId}.jar`);
+        if (fs.existsSync(neoJar)) classpathSet.add(neoJar); // он в -DignoreList, безопасно!!!!!
+
+        const sep = path.delimiter; 
         const classpath = Array.from(classpathSet).join(sep);
         const libraryDir = path.join(minecraftDir, 'libraries');
         const nativesDir = path.join(minecraftDir, 'versions', versionId, 'natives');
         if (!fs.existsSync(nativesDir)) fs.mkdirSync(nativesDir, { recursive: true });
 
-        // УМНЫЙ ПОИСК ИНДЕКСА АССЕТОВ (ДЛЯ ЯЗЫКОВ И ЗВУКОВ)
+
         const indexesDir = path.join(minecraftDir, 'assets', 'indexes');
         let assetIndexId = downloadedIndexId || (vanillaData.assetIndex && vanillaData.assetIndex.id) || (neoData.assetIndex && neoData.assetIndex.id) || "17";
 
@@ -885,11 +852,7 @@ ipcMain.on('launch-game', async (event, args) => {
         }
 
         const ramMB = pickRam(memory || 4096, sender);
-        const xmsMB = Math.min(2048, ramMB);   // стартовая память не может быть больше максимальной
-        // Offline session: accessToken must be the literal "0",
-        // userType must be "legacy". Using the UUID as accessToken breaks the
-        // session handshake that many NeoForge networking mods rely on for
-        // custom_payload packets. This matches Modrinth / Prism / HMCL offline.
+        const xmsMB = Math.min(2048, ramMB);   
         const javaArgs = [
             // macOS: без этого флага GLFW/LWJGL падает при создании окна
             ...(IS_MAC ? ['-XstartOnFirstThread'] : []),
