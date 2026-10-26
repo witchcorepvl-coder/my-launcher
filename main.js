@@ -539,7 +539,7 @@ function getJavaMajor(javaPath) {
         const m = out.match(/version "(\d+)(?:\.(\d+))?/);
         if (!m) return 0;
         let major = parseInt(m[1], 10);
-        if (major === 1 && m[2]) major = parseInt(m[2], 10); // старый формат 1.8
+        if (major === 1 && m[2]) major = parseInt(m[2], 10); 
         return major;
     } catch { return 0; }
 }
