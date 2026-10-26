@@ -15,7 +15,6 @@ const BUILDS = {
     full: {
         id: 'full',
         name: 'FULL',
-        // ВНИМАНИЕ: вставь сюда актуальную ссылку на архив (в IDE у тебя уже новая).
         url: 'https://www.dropbox.com/scl/fi/j0zdw3p93fum06oriezk1/modpack-v1.zip?rlkey=t0v4q5x9n5ncqiw9itd9x9o79&st=3dbfviur&dl=1',
         gameDir: null,
         versionId: 'neoforge-21.1.264'
