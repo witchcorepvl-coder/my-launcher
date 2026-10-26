@@ -423,13 +423,13 @@
         "Свинозомби помнят всё..."
     ];
     document.getElementById('splashText').innerText = splashes[Math.floor(Math.random() * splashes.length)];
-    { // длинные фразы чуть мельче, чтобы не залезали на кнопки окна
+    { 
         const sp = document.getElementById('splashText');
         const len = sp.innerText.length;
         if (len > 26) sp.style.fontSize = '11px'; else if (len > 18) sp.style.fontSize = '12px';
     }
 
-    // ---------- ТИТУЛ: падение с отскоком, пыль, потом сплеш ----------
+
     const titleArt = document.getElementById('titleArt');
     const titleDust = document.getElementById('titleDust');
     const splashEl = document.getElementById('splashText');
@@ -458,14 +458,14 @@
     function playTitleIntro() {
         splashEl.classList.remove('show');
         titleArt.classList.remove('ready', 'drop');
-        void titleArt.offsetWidth;                    // перезапуск анимации
+        void titleArt.offsetWidth;                    
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             titleArt.classList.add('ready'); splashEl.classList.add('show'); return;
         }
         titleArt.classList.add('drop');
         const T = 1250;
-        setTimeout(() => puffDust(1), T * 0.46);        // первый удар
-        setTimeout(() => puffDust(0.45), T * 0.78);     // второй, слабее
+        setTimeout(() => puffDust(1), T * 0.46);       
+        setTimeout(() => puffDust(0.45), T * 0.78);     
     }
 
     titleArt.addEventListener('animationend', (e) => {
@@ -474,11 +474,10 @@
         titleArt.classList.add('ready');
         splashEl.classList.add('show');
     });
-    // Клик по титулу — уронить ещё раз
     titleArt.addEventListener('click', () => { if (titleArt.classList.contains('ready')) playTitleIntro(); });
     playTitleIntro();
 
-    // Путь к папке выбранной сборки (реальный, для Windows и macOS)
+
     function updateGameDirLabel() {
         ipcRenderer.invoke('get-game-dir', currentBuild).then(dir => {
             const s = dir.includes('\\') ? '\\' : '/';
@@ -551,16 +550,15 @@
         }, speed);
     }
 
-    // ---------- КОМЕТЫ (ASCII) ----------
-    // Изредка пролетают по диагонали: хвост из символов с затуханием, яркая голова.
+
     const cometLayer = document.getElementById('cometLayer');
     const COMET_TAILS = ['.·:-~=+*#', ' .  . - - = = + *', '.,:;-=+x*', '. . : : - = ≡ *'];
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function spawnComet() {
         const W = window.innerWidth, H = window.innerHeight;
-        const toRight = Math.random() < 0.7;                 // чаще летят слева направо
-        const angle = 20 + Math.random() * 25;               // наклон вниз, градусы
+        const toRight = Math.random() < 0.7;                
+        const angle = 20 + Math.random() * 25;               
         const rad = angle * Math.PI / 180;
         let tail = COMET_TAILS[Math.floor(Math.random() * COMET_TAILS.length)];
         const chars = tail.split('');
@@ -599,18 +597,18 @@
     }
 
     function scheduleComet() {
-        const delay = 4000 + Math.random() * 9000;           // раз в 4–13 секунд
+        const delay = 4000 + Math.random() * 9000;           
         setTimeout(() => {
             if (!document.hidden) {
                 spawnComet();
-                if (Math.random() < 0.15) setTimeout(spawnComet, 250 + Math.random() * 500); // иногда парой
+                if (Math.random() < 0.15) setTimeout(spawnComet, 250 + Math.random() * 500); 
             }
             scheduleComet();
         }, delay);
     }
     if (!reduceMotion) { setTimeout(spawnComet, 1500); scheduleComet(); }
 
-    // ---------- ВЫБОР СБОРКИ ----------
+
     const BUILD_RAM = { full: 6144, lite: 4096 };
     let currentBuild = localStorage.getItem('pvl_build') === 'lite' ? 'lite' : 'full';
     let currentRam = BUILD_RAM[currentBuild];
@@ -660,7 +658,7 @@
 
     usernameInput.value = localStorage.getItem('pvl_user') || '';
 
-    // ---------- СТАТУС СЕРВЕРА ----------
+
     let SERVER_IP = 'spiral-zurich.tun.ply.gg';
     const srvIcon = document.getElementById('srvIcon');
     const srvDot = document.getElementById('srvDot');
@@ -706,11 +704,11 @@
 
     document.getElementById('serverBox').addEventListener('click', updateServerStatus);
 
-    // ---------- НОВОСТИ (с кэшем) ----------
-    let newsHtml = null;      // последние новости
+
+    let newsHtml = null;     
     let newsFromCache = false;
-    let consoleLines = [];    // лог последнего запуска (для «СКОПИРОВАТЬ ЛОГ»)
-    let viewMode = 'news';    // 'news' | 'console'
+    let consoleLines = [];    
+    let viewMode = 'news';    
     const MAX_CONSOLE_LINES = 3000;
 
     function loadNewsCache() {
@@ -748,7 +746,7 @@
         scrollArea.scrollTop = scrollArea.scrollHeight;
     }
 
-    // Сначала мгновенно показываем кэш, потом обновляем из сети
+
     const cached = loadNewsCache();
     if (cached) { applyConfig(cached); newsFromCache = true; showNews(); }
     else terminalOutput.innerHTML = `> ЗАГРУЗКА НОВОСТЕЙ...<span class="blink">_</span>`;
@@ -826,9 +824,7 @@
         ipcRenderer.send('launch-game', { username, memory: currentRam, buildType: currentBuild, autoUpdate: true, forceUpdate: true });
     });
 
-    // Разблокировать кнопки после выхода из игры или ошибки
-    // Игра закрылась нормально — через пару секунд возвращаем новости.
-    // Если вылет или ошибка — оставляем лог на экране, чтобы было видно причину.
+
     let backToNewsTimer = null;
     ipcRenderer.on('launch-finished', (_, info) => {
         setBusy(false);
