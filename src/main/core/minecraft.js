@@ -100,7 +100,7 @@ async function ensureLibraries(libs, r) {
     r.log(`> НЕДОСТАЁТ БИБЛИОТЕК: ${queue.length}. СКАЧИВАНИЕ...`);
     r.status('Загружаю библиотеки');
     await runPool(queue, 8, (it) => downloadFile(it.url, it.dest, { sha1: it.sha1 }),
-        (done, total) => r.send('progress', { task: done, total }));
+        (done, total) => r.progress(done, total));
     r.log('> БИБЛИОТЕКИ ЗАГРУЖЕНЫ.');
 }
 
@@ -133,7 +133,7 @@ async function ensureAssets(vanillaData, r) {
         let last = 0;
         await runPool(queue, 16, (it) => downloadFile(it.url, it.dest, { sha1: it.sha1 }),
             (done, total) => {
-                if (done - last >= 20 || done === total) { last = done; r.send('progress', { task: done, total }); }
+                if (done - last >= 20 || done === total) { last = done; r.progress(done, total); }
             });
         r.log('> АССЕТЫ ЗАГРУЖЕНЫ.');
     }
