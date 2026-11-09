@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'">
+  <title>PVL Craft</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="booting">
+  <!-- Фон: размытое видео сборки -->
+  <div id="bg">
+    <video id="bgVideo" autoplay muted loop playsinline preload="auto">
+      <source src="../../assets/background.webm" type="video/webm">
+      <source src="../../assets/background.mp4" type="video/mp4">
+    </video>
+    <div class="bg-tint"></div>
+    <div class="bg-vignette"></div>
+  </div>
+
+  <!-- Верхняя панель -->
+  <header id="titlebar">
+    <div class="drag"></div>
+    <div class="win-buttons">
+      <button class="circle glass-lite" id="btnSettings" data-tip="Настройки" aria-label="Настройки">
+        <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.54V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.1-1.54 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.54-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.54V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.54 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.54 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.54 1Z"/></svg>
+      </button>
+      <button class="circle glass-lite" id="btnMin" aria-label="Свернуть"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+      <button class="circle glass-lite danger" id="btnClose" aria-label="Закрыть"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <!-- Логотип и сплэш -->
+    <section id="hero">
+      <div id="logoWrap">
+        <img id="logo" src="../../assets/logo.png" alt="PVL Craft" draggable="false">
+        <canvas id="logoShine"></canvas>
+      </div>
+      <div id="splash"></div>
+    </section>
+
+    <!-- Новости -->
+    <section id="news" class="glass card reveal">
+      <div class="card-head">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24"><path d="M4 5h13a2 2 0 0 1 2 2v12H6a2 2 0 0 1-2-2V5Z"/><path d="M19 9h1a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2"/><path d="M8 9h7M8 13h7M8 17h4"/></svg>
+          Новости
+        </div>
+        <span id="newsBadge" class="chip hidden"></span>
+      </div>
+      <div id="newsBody" class="scroll fade-edges"><div class="skeleton"><i></i><i></i><i></i><i></i></div></div>
+    </section>
+
+    <!-- Профиль и скин -->
+    <section id="profile" class="glass card reveal">
+      <div class="card-head">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          Профиль
+        </div>
+        <span id="skinBadge" class="chip hidden"></span>
+      </div>
+      <div id="skinStage">
+        <canvas id="fwCanvas"></canvas>
+        <div class="pedestal"></div>
+        <canvas id="skinCanvas" width="300" height="296"></canvas>
+        <canvas id="fxCanvas" width="420" height="440"></canvas>
+        <div id="skinLoader" class="hidden"><span></span></div>
+      </div>
+      <label id="nickField" class="field">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+        <input id="nick" type="text" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Твой ник">
+        <span id="nickState"></span>
+      </label>
+      <div id="nickHint" class="hint">Скин подтянется по нику с Mojang</div>
+    </section>
+
+    <!-- Нижняя панель -->
+    <section id="dock" class="glass reveal">
+      <div id="serverPill" class="pill" data-tip="">
+        <div id="serverIcon"><span class="dot"></span></div>
+        <div class="pill-text">
+          <div id="serverLine1"><b id="onlineCount">…</b> <span id="onlineWord">проверяю сервер</span></div>
+        </div>
+      </div>
+
+      <button id="play" class="play">
+        <span class="play-fill"></span>
+        <span class="play-shine"></span>
+        <span class="play-label">
+          <span id="playTitle">Играть</span>
+          <span id="playSub">Сразу на сервер</span>
+        </span>
+        <span id="playPercent"></span>
+      </button>
+    </section>
+  </main>
+
+  <!-- Консоль (журнал запуска) -->
+  <div id="consoleSheet" class="sheet sheet-bottom glass">
+    <div class="sheet-head">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24"><path d="M4 6l5 5-5 5M11 17h9"/></svg>
+        Журнал запуска
+      </div>
+      <div class="sheet-actions">
+        <button class="btn-ghost" id="btnCopyLog">Скопировать</button>
+        <button class="circle glass-lite" id="btnCloseConsole" aria-label="Закрыть"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+      </div>
+    </div>
+    <pre id="log" class="scroll"></pre>
+  </div>
+
+  <!-- Настройки -->
+  <div id="scrim"></div>
+  <aside id="settingsSheet" class="sheet sheet-right glass">
+    <div class="sheet-head">
+      <div class="card-title">Настройки</div>
+      <button class="circle glass-lite" id="btnCloseSettings" aria-label="Закрыть"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+    </div>
+    <div class="scroll settings-body">
+      <div class="group">
+        <div class="group-title">Версия сборки</div>
+        <div class="segmented seg3" id="buildPicker" role="tablist">
+          <div class="seg-indicator"></div>
+          <button class="seg" data-build="auto" role="tab">Авто</button>
+          <button class="seg" data-build="full" role="tab">FULL</button>
+          <button class="seg" data-build="lite" role="tab">LITE</button>
+        </div>
+        <div class="hint left" id="buildHint"></div>
+        <div class="hint left" id="buildState"></div>
+      </div>
+      <div class="group">
+        <div class="group-title">Память для игры · <span id="ramBuildName">FULL</span></div>
+        <div class="row">
+          <input type="range" id="ram" min="2" max="16" step="1">
+          <span id="ramValue" class="value">6 ГБ</span>
+        </div>
+        <div class="hint" id="ramHint"></div>
+      </div>
+      <div class="group">
+        <div class="group-title">Игра</div>
+        <label class="toggle-row"><span>Сразу заходить на сервер</span><input type="checkbox" id="optQuickJoin"><i class="toggle"></i></label>
+        <label class="toggle-row"><span>Сворачивать лаунчер во время игры</span><input type="checkbox" id="optHide"><i class="toggle"></i></label>
+        <label class="toggle-row"><span>Обновлять сборку автоматически</span><input type="checkbox" id="optAutoUpdate"><i class="toggle"></i></label>
+      </div>
+      <div class="group">
+        <div class="group-title">Звук</div>
+        <label class="toggle-row"><span>Звуки интерфейса</span><input type="checkbox" id="optSfx"><i class="toggle"></i></label>
+        <div class="row"><span class="row-label">Громкость</span><input type="range" id="sfxVol" min="0" max="100"></div>
+        <div class="row" id="musicRow"><span class="row-label">Музыка</span><input type="range" id="musicVol" min="0" max="100"></div>
+      </div>
+      <div class="group">
+        <div class="group-title">Файлы</div>
+        <div class="buttons">
+          <button class="btn-ghost" id="btnOpenFolder">Открыть папку игры</button>
+          <button class="btn-ghost" id="btnShowLog">Журнал запуска</button>
+          <button class="btn-ghost" id="btnOpenLogs">Папка с логами лаунчера</button>
+          <button class="btn-ghost warn" id="btnReinstall">Переустановить сборку</button>
+        </div>
+      </div>
+      <div class="about" id="about"></div>
+    </div>
+  </aside>
+
+  <canvas id="heartsCanvas"></canvas>
+
+  <!-- Если интерфейс не смог запуститься — понятное сообщение вместо пустого окна -->
+  <div id="fatal" class="hidden">
+    <div class="fatal-card glass">
+      <div class="fatal-title">Лаунчер не смог запуститься</div>
+      <pre id="fatalText"></pre>
+      <div class="fatal-hint">Подробности — в файле logs/launcher.log в папке игры. Нажми F5, чтобы попробовать ещё раз.</div>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+  <div id="tooltip"></div>
+
+  <audio id="music" loop preload="auto"></audio>
+
+  <script src="guard.js"></script>
+  <script src="../../node_modules/skinview3d/bundles/skinview3d.bundle.js"></script>
+  <script src="sounds.js"></script>
+  <script src="skin.js"></script>
+  <script src="celebrate.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
